@@ -11,17 +11,15 @@ function Cart() {
     totalPrice,
   } = useCart();
 
-  // We'll store an address the user can type
   const [address, setAddress] = useState('');
 
-  // Construct WhatsApp order message
   const buildWhatsAppMessage = () => {
     if (cartItems.length === 0) return '';
 
     let message = 'Olá, Turi Ateliê! Gostaria de finalizar minha compra:%0A%0A';
 
     cartItems.forEach((item) => {
-      message += `- ${item.quantity} x ${item.name} (R$ ${item.price.toFixed(2)})%0A`;
+      message += `- ${item.quantity} x ${item.name} (${item.variant}) - R$ ${item.price.toFixed(2)}%0A`;
     });
 
     message += `%0AValor total: R$ ${totalPrice.toFixed(2)}`;
@@ -59,7 +57,14 @@ function Cart() {
             const itemSubtotal = item.price * item.quantity;
             return (
               <tr key={item.id}>
-                <td style={{ borderBottom: '1px solid #ddd', padding: '0.5rem' }}>{item.name}</td>
+                <td style={{ borderBottom: '1px solid #ddd', padding: '0.5rem' }}>
+                  <div>
+                    <strong>{item.name}</strong>
+                    <div style={{ fontSize: '0.9rem', color: '#666' }}>
+                      Variante: {item.variant}
+                    </div>
+                  </div>
+                </td>
                 <td style={{ borderBottom: '1px solid #ddd', textAlign: 'center', padding: '0.5rem' }}>
                   R$ {item.price.toFixed(2)}
                 </td>
