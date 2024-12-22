@@ -1,281 +1,515 @@
-**Why the errors are happening:**
+Below is one possible way to implement a **Cart** feature with a WhatsApp deeplink in your existing React app. The changes include:
 
-1. **Undefined image variables (`cravoCanela`, `laranja`, `coracao`):**  
-   In your **Home.js**, you’re referencing images named `cravoCanela`, `laranja`, and `coracao` but **never imported them**. This causes the “not defined” (no-undef) error.  
-
-2. **Background not showing:**  
-   - Often this is a path issue: make sure you’re spelling the filename exactly as it appears (including hyphens, underscores, and extension) and that the relative path is correct.  
-   - Also ensure the parent container/styles aren’t overshadowing it. For example, if a parent div is covering the height or has a background color sitting on top.
-
-Below are the **common fixes**:
+1. A **Cart Context** to store and manage cart items.  
+2. A **Cart** page for viewing and finalizing the order.  
+3. Updated **Header** to include a link to the cart.  
+4. Updated **Products** page to allow adding items to the cart.  
+5. Updated **App** to wrap everything with the Cart Context and define a new route for the Cart page.
 
 ---
 
-## 1) Import your images correctly in `Home.js`
+## 1) Create a Cart Context
 
-Inside **`Home.js`** (or wherever you want to use the images), add imports for the candle images at the top of the file:
-
-```js
-import React from 'react';
-import { Link } from 'react-router-dom';
-import backgroundImage from '../assets/home-background.jpg';
-
-// Import candle images from your products folder
-import cravoCanela from '../assets/products/cravoecanela.png';
-import laranja from '../assets/products/laranja.png';
-import coracao from '../assets/products/coracao.png';
+Create a new file at:  
+```
+/src/context/CartContext.js
 ```
 
-Now you can safely reference `cravoCanela`, `laranja`, and `coracao` in your JSX.
+**CartContext.js**:
+```js
+import React, { createContext, useState, useContext } from 'react';
+
+// Create the CartContext
+const CartContext = createContext();
+
+// Create a custom hook for easy access to the CartContext
+export function useCart() {
+  return useContext(CartContext);
+}
+
+// CartProvider to wrap around the root of the app
+export function CartProvider({ children }) {
+  const [cartItems, setCartItems] = useState([]); // Array of { id, name, price, quantity }
+
+  // Add item to cart
+  const addToCart = (product) => {
+    setCartItems((prevItems) => {
+      // Check if item already exists
+      const existingItemIndex = prevItems.findIndex((item) => item.id === product.id);
+      if (existingItemIndex >= 0) {
+        // Increase quantity
+        const updatedItems = [...prevItems];
+        updatedItems[existingItemIndex].quantity += 1;
+        return updatedItems;
+      } else {
+        // Add new item
+        return [...prevItems, { ...product, quantity: 1 }];
+      }
+    });
+  };
+
+  // Remove a single unit from cart
+  const removeFromCart = (productId) => {
+    setCartItems((prevItems) => {
+      const updatedItems = prevItems
+        .map((item) =>
+          item.id === productId
+            ? { ...item, quantity: item.quantity - 1 }
+            : item
+        )
+        .filter((item) => item.quantity > 0);
+      return updatedItems;
+    });
+  };
+
+  // Remove item entirely
+  const removeItemCompletely = (productId) => {
+    setCartItems((prevItems) => prevItems.filter((item) => item.id !== productId));
+  };
+
+  // Clear the cart
+  const clearCart = () => {
+    setCartItems([]);
+  };
+
+  // Calculate total price
+  const totalPrice = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+
+  const value = {
+    cartItems,
+    addToCart,
+    removeFromCart,
+    removeItemCompletely,
+    clearCart,
+    totalPrice,
+  };
+
+  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
+}
+```
 
 ---
 
-## 2) Check the background image path
+## 2) Create a Cart Page
 
-In your code, you have:
+Create a new file at:  
+```
+/src/pages/Cart.js
+```
 
+**Cart.js**:
 ```js
-import backgroundImage from '../assets/home-background.jpg';
-```
+import React, { useState } from 'react';
+import { useCart } from '../context/CartContext';
 
-And then:
+function Cart() {
+  const {
+    cartItems,
+    addToCart,
+    removeFromCart,
+    removeItemCompletely,
+    clearCart,
+    totalPrice,
+  } = useCart();
 
-```js
-<div 
-  style={{
-    backgroundImage: `url(${backgroundImage})`,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    height: '100vh',
-    ...
-  }}
->
-  ...
-</div>
-```
+  // We'll store an address the user can type
+  const [address, setAddress] = useState('');
 
-That’s typically correct if:
-- The file **really is** named `home-background.jpg` (not `.jpeg`, not `home_background.jpg`).
-- The file is in `src/assets` relative to `src/pages/Home.js` (which means `../assets/home-background.jpg` is correct).
+  // Construct WhatsApp order message
+  const buildWhatsAppMessage = () => {
+    if (cartItems.length === 0) return '';
 
-In your file tree, the path seems correct:
-```
-turi-atelie
-└── src
-    └── assets
-        └── home-background.jpg
-```
-and  
-```
-turi-atelie
-└── src
-    └── pages
-        └── Home.js
-```
+    let message = 'Olá, Turi Ateliê! Gostaria de finalizar minha compra:%0A%0A';
 
-So `../assets/home-background.jpg` is indeed the right relative path.  
+    cartItems.forEach((item) => {
+      message += `- ${item.quantity} x ${item.name} (R$ ${item.price.toFixed(2)})%0A`;
+    });
 
-**If you still don’t see the background**, check:
+    message += `%0AValor total: R$ ${totalPrice.toFixed(2)}`;
+    message += `%0AEndereço de entrega: ${encodeURIComponent(address)}`;
+    message += '%0A%0AMuito obrigado! Aguardo informações sobre a finalização do pedido.';
 
-- Make sure the **parent** `<div>` (the one with `minHeight: '100vh'`, `backgroundColor: '#f5f5f5'`) isn’t sitting on top or overshadowing it. Since you nest the “hero” `<div>` *inside* that container, the background should still be visible if the “hero” container is also `height: '100vh'`.  
-- Confirm that you have no other CSS overrides that might set a different background or hide it.
+    return message;
+  };
 
----
+  const whatsAppLink = `https://wa.me/24992288877?text=${buildWhatsAppMessage()}`;
 
-## 3) Example of a corrected `Home.js`
+  if (cartItems.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '2rem' }}>
+        <h2>Seu carrinho está vazio.</h2>
+      </div>
+    );
+  }
 
-Below is a minimal example that **imports** the images and ensures the background is used. Notice the new lines at the top (imports of `cravoCanela`, `laranja`, `coracao`):
-
-```js
-import React from 'react';
-import { Link } from 'react-router-dom';
-import backgroundImage from '../assets/home-background.jpg';
-
-// ADD THESE IMPORTS:
-import cravoCanela from '../assets/products/cravoecanela.png';
-import laranja from '../assets/products/laranja.png';
-import coracao from '../assets/products/coracao.png';
-
-function Home() {
   return (
-    <div style={{ textAlign: 'center', minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
-      {/* Hero Section: Full-screen background */}
-      <div 
-        style={{
-          backgroundImage: `url(${backgroundImage})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          height: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          color: '#2c2c2c',
-          position: 'relative'
-        }}
-      >
-        <div style={{ 
-          position: 'relative',
-          zIndex: 2,
-          padding: '3rem',
-          maxWidth: '600px',
-          margin: '0 auto',
-          backgroundColor: 'rgba(255, 255, 255, 0.85)',
-          borderRadius: '4px',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-        }}>
-          <h1 style={{ 
-            fontSize: '3rem', 
-            marginBottom: '1.5rem',
-            fontWeight: '300',
-            letterSpacing: '3px',
-            color: '#1a1a1a'
-          }}>
-            Turi Ateliê
-          </h1>
-          <p style={{ 
-            fontSize: '1.2rem',
-            marginBottom: '2rem',
-            fontWeight: '300',
-            letterSpacing: '1px',
-            color: '#4a4a4a',
-            lineHeight: '1.6'
-          }}>
-            Iluminando momentos, criando memórias
-          </p>
-          <Link 
-            to="/produtos" 
-            className="btn" 
-            style={{ 
-              margin: '1rem auto 0 auto',
-              textDecoration: 'none',
-              fontSize: '1.1rem',
-              padding: '1rem 2rem',
-              letterSpacing: '1px',
-              backgroundColor: '#8b7355',
-              border: 'none',
-              transition: 'all 0.3s ease'
-            }}
-          >
-            Descubra nossas velas
-          </Link>
-        </div>
+    <div style={{ padding: '2rem' }}>
+      <h2 style={{ textAlign: 'center', marginBottom: '2rem' }}>Carrinho de Compras</h2>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '2rem' }}>
+        <thead>
+          <tr>
+            <th style={{ borderBottom: '1px solid #ddd', textAlign: 'left', padding: '0.5rem' }}>Produto</th>
+            <th style={{ borderBottom: '1px solid #ddd', textAlign: 'center', padding: '0.5rem' }}>Preço</th>
+            <th style={{ borderBottom: '1px solid #ddd', textAlign: 'center', padding: '0.5rem' }}>Quantidade</th>
+            <th style={{ borderBottom: '1px solid #ddd', textAlign: 'center', padding: '0.5rem' }}>Subtotal</th>
+            <th style={{ borderBottom: '1px solid #ddd', padding: '0.5rem' }}></th>
+          </tr>
+        </thead>
+        <tbody>
+          {cartItems.map((item) => {
+            const itemSubtotal = item.price * item.quantity;
+            return (
+              <tr key={item.id}>
+                <td style={{ borderBottom: '1px solid #ddd', padding: '0.5rem' }}>{item.name}</td>
+                <td style={{ borderBottom: '1px solid #ddd', textAlign: 'center', padding: '0.5rem' }}>
+                  R$ {item.price.toFixed(2)}
+                </td>
+                <td style={{ borderBottom: '1px solid #ddd', textAlign: 'center', padding: '0.5rem' }}>
+                  <button
+                    className="btn"
+                    style={{ marginRight: '0.5rem' }}
+                    onClick={() => removeFromCart(item.id)}
+                  >
+                    -
+                  </button>
+                  {item.quantity}
+                  <button
+                    className="btn"
+                    style={{ marginLeft: '0.5rem' }}
+                    onClick={() => addToCart(item)}
+                  >
+                    +
+                  </button>
+                </td>
+                <td style={{ borderBottom: '1px solid #ddd', textAlign: 'center', padding: '0.5rem' }}>
+                  R$ {itemSubtotal.toFixed(2)}
+                </td>
+                <td style={{ borderBottom: '1px solid #ddd', textAlign: 'center', padding: '0.5rem' }}>
+                  <button
+                    className="btn"
+                    style={{ backgroundColor: '#c0392b' }}
+                    onClick={() => removeItemCompletely(item.id)}
+                  >
+                    Remover
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      
+      <div style={{ marginBottom: '2rem', textAlign: 'right' }}>
+        <h3>Total: R$ {totalPrice.toFixed(2)}</h3>
       </div>
 
-      {/* Additional Sections */}
-      <section style={{ padding: '3rem 1rem', maxWidth: '1000px', margin: '0 auto' }}>
-        <h2 style={{ fontSize: '2rem', marginBottom: '2rem', color: '#4a3f35' }}>
-          Nossas Outras Criações
-        </h2>
+      <div style={{ marginBottom: '2rem' }}>
+        <label htmlFor="address" style={{ display: 'block', marginBottom: '0.5rem' }}>Endereço de Entrega:</label>
+        <input
+          id="address"
+          type="text"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '0.5rem',
+            fontSize: '1rem',
+            borderRadius: '4px',
+            border: '1px solid #ccc',
+          }}
+          placeholder="Digite seu endereço completo..."
+        />
+      </div>
 
-        <p style={{ fontSize: '1.1rem', lineHeight: '1.6', marginBottom: '2rem' }}>
-          Além das Velas dos Desejos, exploramos diversas linhas para atender cada momento da sua vida. 
-          Cada vela é cuidadosamente elaborada com fragrâncias que inspiram e transformam ambientes, 
-          trazendo harmonia e bem-estar.
-        </p>
-
-        {/* Grid of Additional Candle Types */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', justifyContent: 'center' }}>
-          
-          {/* Card 1 */}
-          <div 
-            style={{
-              width: '300px',
-              border: '1px solid #ddd',
-              borderRadius: '6px',
-              boxShadow: '0 0 5px rgba(0,0,0,0.05)',
-              overflow: 'hidden',
-              backgroundColor: '#fff'
-            }}
-          >
-            <img 
-              src={cravoCanela} 
-              alt="Vela de Cravo e Canela" 
-              style={{ width: '100%', height: '250px', objectFit: 'cover' }}
-            />
-            <div style={{ padding: '1rem', textAlign: 'left' }}>
-              <h3 style={{ marginBottom: '0.5rem', color: '#4A3F35' }}>Vela Cravo e Canela</h3>
-              <p style={{ fontSize: '0.95rem', marginBottom: '1rem' }}>
-                Estimula a energia e a paixão, trazendo calor e aconchego ao ambiente. 
-                Ideal para jantares românticos ou momentos de reflexão.
-              </p>
-              <Link to="/produtos" className="btn">Saiba mais</Link>
-            </div>
-          </div>
-
-          {/* Card 2 */}
-          <div 
-            style={{
-              width: '300px',
-              border: '1px solid #ddd',
-              borderRadius: '6px',
-              boxShadow: '0 0 5px rgba(0,0,0,0.05)',
-              overflow: 'hidden',
-              backgroundColor: '#fff'
-            }}
-          >
-            <img 
-              src={laranja} 
-              alt="Vela de Flor de Laranjeira" 
-              style={{ width: '100%', height: '250px', objectFit: 'cover' }}
-            />
-            <div style={{ padding: '1rem', textAlign: 'left' }}>
-              <h3 style={{ marginBottom: '0.5rem', color: '#4A3F35' }}>Vela Flor de Laranjeira</h3>
-              <p style={{ fontSize: '0.95rem', marginBottom: '1rem' }}>
-                Transmite vitalidade e frescor, perfeita para começar o dia 
-                ou para trazer boas energias ao seu espaço.
-              </p>
-              <Link to="/produtos" className="btn">Saiba mais</Link>
-            </div>
-          </div>
-
-          {/* Card 3 */}
-          <div 
-            style={{
-              width: '300px',
-              border: '1px solid #ddd',
-              borderRadius: '6px',
-              boxShadow: '0 0 5px rgba(0,0,0,0.05)',
-              overflow: 'hidden',
-              backgroundColor: '#fff'
-            }}
-          >
-            <img 
-              src={coracao} 
-              alt="Vela em Formato de Coração" 
-              style={{ width: '100%', height: '250px', objectFit: 'cover' }}
-            />
-            <div style={{ padding: '1rem', textAlign: 'left' }}>
-              <h3 style={{ marginBottom: '0.5rem', color: '#4A3F35' }}>Vela Coração</h3>
-              <p style={{ fontSize: '0.95rem', marginBottom: '1rem' }}>
-                Um toque romântico para ocasiões especiais ou para decorar seu cantinho 
-                de forma delicada e encantadora.
-              </p>
-              <Link to="/produtos" className="btn">Saiba mais</Link>
-            </div>
-          </div>
-
-        </div>
-      </section>
+      <div style={{ textAlign: 'right' }}>
+        <button className="btn" style={{ marginRight: '1rem' }} onClick={clearCart}>
+          Limpar Carrinho
+        </button>
+        <a href={whatsAppLink} target="_blank" rel="noopener noreferrer" className="btn">
+          Finalizar Compra (WhatsApp)
+        </a>
+      </div>
     </div>
   );
 }
 
-export default Home;
+export default Cart;
 ```
 
-With those fixes:
-
-- **Imports** are defined, so `cravoCanela`, `laranja`, and `coracao` are recognized.
-- The **background** should appear as long as the image file name and path are correct, and you have no overriding CSS hiding it.
+**Explanation**:  
+- The user can increase/decrease item quantities.  
+- The user can remove an item entirely.  
+- The user enters an address before clicking **Finalizar Compra**.  
+- Clicking **Finalizar Compra** opens WhatsApp with a prefilled message that includes all cart items, total price, and the address.
 
 ---
 
-### Final Tips
+## 3) Update the Header to Include a Cart Link
 
-1. **Always import** images you reference in JSX with `import someVar from 'path/to/image'`.
-2. **Check spelling** and file extensions carefully (`home-background.jpg` vs. `home_background.jpg`, etc.).
-3. If your background still doesn’t appear, try placing the same URL in a normal `<img>` or a test `<div>` to confirm the build sees it:
-   ```js
-   <img src={backgroundImage} alt="Test" />
-   ```
-   If that works, you know the file is loading fine—then the issue is likely a styling/z-index/height mismatch in your hero section.
+In your existing header component at:  
+```
+/src/components/Header.js
+```
+Replace with:
+
+```js
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { useCart } from '../context/CartContext';
+
+function Header() {
+  const { cartItems } = useCart();
+  
+  // Calculate the total quantity for the cart badge
+  const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  return (
+    <header>
+      <h1>Turi Ateliê</h1>
+      <nav>
+        <Link to="/">Início</Link>
+        <Link to="/produtos">Produtos</Link>
+        <Link to="/cart" style={{ marginLeft: '1rem', position: 'relative' }}>
+          Carrinho
+          {totalQuantity > 0 && (
+            <span
+              style={{
+                background: '#c0392b',
+                color: '#fff',
+                borderRadius: '50%',
+                padding: '0.2rem 0.5rem',
+                fontSize: '0.8rem',
+                marginLeft: '0.3rem',
+                position: 'absolute',
+                top: '-10px',
+                right: '-10px',
+              }}
+            >
+              {totalQuantity}
+            </span>
+          )}
+        </Link>
+      </nav>
+    </header>
+  );
+}
+
+export default Header;
+```
+
+**Explanation**:  
+- We import `useCart` so we can display a badge with the total number of items in the cart.  
+- A new **Carrinho** link points to `/cart`.
+
+---
+
+## 4) Update the Products Page to Allow Adding Items to the Cart
+
+At:  
+```
+/src/pages/Products.js
+```
+Replace with:
+
+```js
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { useCart } from '../context/CartContext';
+import homeBackground from '../assets/home-background.png';
+
+function Products() {
+  // Example product list (you can replace with your own logic/data):
+  const productList = [
+    {
+      id: 1,
+      name: 'Velas dos Desejos',
+      image: homeBackground,
+      price: 30.0,
+      detailsLink: '/vela-dos-desejos',
+    },
+    {
+      id: 2,
+      name: 'Velas Clássicas',
+      image: 'https://via.placeholder.com/300x200?text=Velas+Cl%C3%A1ssicas',
+      price: 15.0,
+      detailsLink: '#',
+    },
+    {
+      id: 3,
+      name: 'Velas no Gesso',
+      image: 'https://via.placeholder.com/300x200?text=Velas+no+Gesso',
+      price: 25.0,
+      detailsLink: '#',
+    },
+  ];
+
+  const { addToCart } = useCart();
+
+  return (
+    <div id="produtos">
+      <h2 style={{ textAlign: 'center', marginBottom: '2rem' }}>Nossos Produtos</h2>
+      <div className="product-container">
+        {productList.map((product) => (
+          <div
+            key={product.id}
+            className={
+              product.name === 'Velas dos Desejos'
+                ? 'product-card product-card-first'
+                : 'product-card'
+            }
+            style={
+              product.name === 'Velas dos Desejos'
+                ? {
+                    backgroundImage: `url(${product.image})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                  }
+                : {}
+            }
+          >
+            {product.name !== 'Velas dos Desejos' && (
+              <img
+                src={product.image}
+                alt={product.name}
+              />
+            )}
+            <div
+              className="info"
+              style={
+                product.name === 'Velas dos Desejos'
+                  ? { backgroundColor: 'rgba(0, 0, 0, 0.4)', padding: '1rem' }
+                  : {}
+              }
+            >
+              <h3 style={{ marginBottom: '0.5rem' }}>{product.name}</h3>
+              <p>R$ {product.price.toFixed(2)}</p>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <Link
+                  to={product.detailsLink}
+                  className="btn"
+                  style={{ textDecoration: 'none' }}
+                >
+                  Detalhes
+                </Link>
+                <button
+                  className="btn"
+                  onClick={() => addToCart(product)}
+                >
+                  Adicionar ao Carrinho
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default Products;
+```
+
+**Explanation**:  
+- We define a small `productList` array with an `id`, `name`, `price`, an image, and a `detailsLink`.  
+- For each product, we show a "Detalhes" button (still linking to the existing detail page if relevant) and an **Adicionar ao Carrinho** button, which calls `addToCart(product)` from our context.
+
+---
+
+## 5) Update App.js to Wrap with the CartProvider & Add a Cart Route
+
+At:  
+```
+/src/App.js
+```
+Replace with:
+
+```js
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Layout from './components/Layout';
+import Home from './pages/Home';
+import Products from './pages/Products';
+import VelaDosDesejosDetalhe from './pages/VelaDosDesejosDetalhe';
+import Cart from './pages/Cart';
+import { CartProvider } from './context/CartContext';
+import './App.css';
+
+function App() {
+  return (
+    <Router>
+      {/* Wrap everything with CartProvider */}
+      <CartProvider>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/produtos" element={<Products />} />
+            <Route path="/vela-dos-desejos" element={<VelaDosDesejosDetalhe />} />
+            <Route path="/cart" element={<Cart />} />
+          </Routes>
+        </Layout>
+      </CartProvider>
+    </Router>
+  );
+}
+
+export default App;
+```
+
+**Explanation**:  
+- We import `Cart` and add a new route for it: `/cart`.  
+- We wrap our entire application in the `<CartProvider>` so that all components can access the cart context.
+
+---
+
+## 6) (Optional) Minor CSS Adjustments
+
+Your existing `App.css` should already have `.btn` and other classes. If you’d like to style the new Cart table further or adjust the buttons, you can do so directly in `App.css`.
+
+---
+
+# Final Project Structure
+
+```
+turi-atelie
+├── README.md
+├── package.json
+├── public
+│   ├── favicon.ico
+│   ├── index.html
+│   ├── logo512.png
+│   ├── logo192.png
+│   ├── manifest.json
+│   └── robots.txt
+├── src
+│   ├── App.css
+│   ├── App.js               <-- Updated
+│   ├── index.js
+│   ├── context
+│   │   └── CartContext.js   <-- New
+│   ├── components
+│   │   ├── Header.js        <-- Updated
+│   │   ├── Footer.js
+│   │   └── Layout.js
+│   ├── pages
+│   │   ├── Home.js
+│   │   ├── Products.js      <-- Updated
+│   │   ├── Cart.js          <-- New
+│   │   └── VelaDosDesejosDetalhe.js
+│   └── assets
+│       ├── home_0.png
+│       ├── home-background.jpg
+│       └── products
+│           ├── cravoecanela.png
+│           ├── coracao.png
+│           └── laranja.png
+└── ...
+```
+
+With these changes:
+
+- Users can **add** or **remove** products from the cart.  
+- They can **finalize** the purchase by clicking the **WhatsApp** button, opening a pre-filled message at **+55 (24) 99228-8877**.  
+- They can specify **address** inside the cart page.  
+- Price totals and item quantities are updated dynamically.
+
+This setup should be ready for production build (e.g., `npm run build`), and it follows the general best practices for a simple React application with a global **Cart** state. Enjoy coding!

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import backgroundImage from '../assets/home-background.jpg';
+import backgroundImage from '../assets/home-background.png';
 
 // Import candle images from products folder
 import cravoCanela from '../assets/products/cravoecanela.png';
