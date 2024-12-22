@@ -7,6 +7,7 @@ import ProductDetail from './pages/ProductDetail';
 import Cart from './pages/Cart';
 import { CartProvider } from './context/CartContext';
 import './App.css';
+import { app, analytics } from './firebase/config';
 
 function App() {
   return (
