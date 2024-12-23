@@ -1,11 +1,19 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import backgroundImage from '../assets/home-background.png';
-
-// Import your categories data
-import categoriesData from '../data/categoriesData';
+import { getAllCategories } from '../services/firestoreService.js';
 
 function Home() {
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    async function fetchCategories() {
+      const data = await getAllCategories();
+      setCategories(data);
+    }
+    fetchCategories();
+  }, []);
+
   return (
     <div style={{ textAlign: 'center', minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
       {/* Hero Section: Full-screen background */}
@@ -76,7 +84,7 @@ function Home() {
           Conheça nossas Categorias
         </h2>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', justifyContent: 'center' }}>
-          {categoriesData.map((category) => (
+          {categories.map((category) => (
             <div
               key={category.id}
               style={{

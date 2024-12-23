@@ -1,515 +1,439 @@
-Below is one possible way to implement a **Cart** feature with a WhatsApp deeplink in your existing React app. The changes include:
+Below is an **example approach** to incorporate **product variants**—as represented in your TSV—into your React app. This will involve three main changes:
 
-1. A **Cart Context** to store and manage cart items.  
-2. A **Cart** page for viewing and finalizing the order.  
-3. Updated **Header** to include a link to the cart.  
-4. Updated **Products** page to allow adding items to the cart.  
-5. Updated **App** to wrap everything with the Cart Context and define a new route for the Cart page.
+1. **Overhauling** the data structure in `categoriesData.js` so each product can have **multiple variants**.  
+2. Adding or modifying a **Product Detail** component (or route) where the user can select a variant.  
+3. Ensuring that when an item is added to cart, the **variant** info also appears in the cart.  
 
----
-
-## 1) Create a Cart Context
-
-Create a new file at:  
-```
-/src/context/CartContext.js
-```
-
-**CartContext.js**:
-```js
-import React, { createContext, useState, useContext } from 'react';
-
-// Create the CartContext
-const CartContext = createContext();
-
-// Create a custom hook for easy access to the CartContext
-export function useCart() {
-  return useContext(CartContext);
-}
-
-// CartProvider to wrap around the root of the app
-export function CartProvider({ children }) {
-  const [cartItems, setCartItems] = useState([]); // Array of { id, name, price, quantity }
-
-  // Add item to cart
-  const addToCart = (product) => {
-    setCartItems((prevItems) => {
-      // Check if item already exists
-      const existingItemIndex = prevItems.findIndex((item) => item.id === product.id);
-      if (existingItemIndex >= 0) {
-        // Increase quantity
-        const updatedItems = [...prevItems];
-        updatedItems[existingItemIndex].quantity += 1;
-        return updatedItems;
-      } else {
-        // Add new item
-        return [...prevItems, { ...product, quantity: 1 }];
-      }
-    });
-  };
-
-  // Remove a single unit from cart
-  const removeFromCart = (productId) => {
-    setCartItems((prevItems) => {
-      const updatedItems = prevItems
-        .map((item) =>
-          item.id === productId
-            ? { ...item, quantity: item.quantity - 1 }
-            : item
-        )
-        .filter((item) => item.quantity > 0);
-      return updatedItems;
-    });
-  };
-
-  // Remove item entirely
-  const removeItemCompletely = (productId) => {
-    setCartItems((prevItems) => prevItems.filter((item) => item.id !== productId));
-  };
-
-  // Clear the cart
-  const clearCart = () => {
-    setCartItems([]);
-  };
-
-  // Calculate total price
-  const totalPrice = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
-
-  const value = {
-    cartItems,
-    addToCart,
-    removeFromCart,
-    removeItemCompletely,
-    clearCart,
-    totalPrice,
-  };
-
-  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
-}
-```
+Along the way, we’ll also demonstrate how to **fix the Google Drive links** so they can be properly displayed. (We’ll convert a link like `https://drive.google.com/file/d/<FILE_ID>/view?usp=drive_link` into `https://drive.google.com/uc?export=view&id=<FILE_ID>`.)
 
 ---
 
-## 2) Create a Cart Page
+## 1) Parsing Your TSV and Building the Data Structure
 
-Create a new file at:  
+From your TSV data:
+
 ```
-/src/pages/Cart.js
+Categorias    Foto Categoria                                                              Produto       Variante              Preço  Foto
+Desejos       https://drive.google.com/file/d/1ek7Rw8ZpvLF15iHtbltq3uBD-UobGfq9/view?...  Harmonia      Lavanda              40     https://drive.google.com/file/d/12s1iaSYz6foLSWjPjWdE0-vyMbbdf4nD/view?...
+              (blank)                                                                     Serenidade    Orquidia             40     https://drive.google.com/file/d/1L-Mq6LjbQ9UndSbmRHkp8S0TE0-hGmXa/view?...
+              (blank)                                                                     Sorte         Herbal               40     https://drive.google.com/file/d/1ek7Rw8ZpvLF15iHtbltq3uBD-UobGfq9/view?...
+              (blank)                                                                     Abundancia    Alecrim              40     https://drive.google.com/file/d/1MBoVGnBn5CZMyO-YEWD1c0X19XGUVxRV/view?...
+              (blank)                                                                     Vitalidade    Flor de Laranjeira  40     https://drive.google.com/file/d/1sSmTwQ7_uydwHvSsDKnrzAsPukmlhuU0/view?...
+              (blank)                                                                     Paixão        Cravo e Canela       40     https://drive.google.com/file/d/1sSmTwQ7_uydwHvSsDKnrzAsPukmlhuU0/view?...
+
+Clássicas     https://drive.google.com/file/d/12s1iaSYz6foLSWjPjWdE0-vyMbbdf4nD/view?...  Glitter       Lavanda              50     https://drive.google.com/file/d/1sSmTwQ7_uydwHvSsDKnrzAsPukmlhuU0/view?...
+              (blank)                                                                     Glitter       Orquiídia           50     (same link or similar)
+              (blank)                                                                     Glitter       Herbal              50
+              (blank)                                                                     Glitter       Flor de Laranjeira  50
+              (blank)                                                                     Pote 230g     Flor de Laranjeira  50
+
+Gesso         https://drive.google.com/file/d/1L-Mq6LjbQ9UndSbmRHkp8S0TE0-hGmXa/view?...  Verde         Herbal              45
+              (blank)                                                                     Roxo          Lavanda             45
 ```
 
-**Cart.js**:
+> **Notice** that some “Produto” names repeat for multiple variants (e.g. `"Glitter"` in “Clássicas” has 4 variants). Others appear only once (e.g. `"Paixão"`, `"Pote 230g"`). Either way, we’ll group them by `products[].variants[]`.
+
+### Convert Google Drive Links
+
+1. Original share link (example):  
+   ```
+   https://drive.google.com/file/d/<FILE_ID>/view?usp=drive_link
+   ```
+2. **Direct-embed link**:  
+   ```
+   https://drive.google.com/uc?export=view&id=<FILE_ID>
+   ```
+
+For instance, if your category photo is:  
+```
+https://drive.google.com/file/d/1ek7Rw8ZpvLF15iHtbltq3uBD-UobGfq9/view?usp=drive_link
+```
+The `FILE_ID` is `1ek7Rw8ZpvLF15iHtbltq3uBD-UobGfq9`, so your **embeddable** link becomes:
+```
+https://drive.google.com/uc?export=view&id=1ek7Rw8ZpvLF15iHtbltq3uBD-UobGfq9
+```
+
+Below is a complete **new** `categoriesData.js` reflecting your TSV and using direct-embed links. Pay special attention to the new `variants` arrays:
+
 ```js
+// src/data/categoriesData.js
+
+function fixDriveLink(shareUrl) {
+  // Example input: "https://drive.google.com/file/d/1ABC123/view?usp=drive_link"
+  // We extract "1ABC123" and return: "https://drive.google.com/uc?export=view&id=1ABC123"
+  const match = shareUrl.match(/\/d\/([^/]+)\//);
+  if (!match) {
+    // If we can't parse, fallback to original or a placeholder
+    return shareUrl;
+  }
+  const fileId = match[1];
+  return `https://drive.google.com/uc?export=view&id=${fileId}`;
+}
+
+const categoriesData = [
+  {
+    id: 1,
+    name: 'Desejos',
+    // Convert to direct link:
+    image: fixDriveLink('https://drive.google.com/file/d/1ek7Rw8ZpvLF15iHtbltq3uBD-UobGfq9/view?usp=drive_link'),
+
+    products: [
+      {
+        id: 101,
+        name: 'Harmonia',
+        variants: [
+          {
+            // We can build a unique ID per variant if needed:
+            id: 'harmonia-lavanda',
+            name: 'Lavanda',
+            price: 40,
+            image: fixDriveLink('https://drive.google.com/file/d/12s1iaSYz6foLSWjPjWdE0-vyMbbdf4nD/view?usp=drive_link')
+          },
+        ]
+      },
+      {
+        id: 102,
+        name: 'Serenidade',
+        variants: [
+          {
+            id: 'serenidade-orquidia',
+            name: 'Orquídia',
+            price: 40,
+            image: fixDriveLink('https://drive.google.com/file/d/1L-Mq6LjbQ9UndSbmRHkp8S0TE0-hGmXa/view?usp=drive_link')
+          },
+        ]
+      },
+      {
+        id: 103,
+        name: 'Sorte',
+        variants: [
+          {
+            id: 'sorte-herbal',
+            name: 'Herbal',
+            price: 40,
+            image: fixDriveLink('https://drive.google.com/file/d/1ek7Rw8ZpvLF15iHtbltq3uBD-UobGfq9/view?usp=drive_link')
+          }
+        ]
+      },
+      {
+        id: 104,
+        name: 'Abundância',
+        variants: [
+          {
+            id: 'abundancia-alecrim',
+            name: 'Alecrim',
+            price: 40,
+            image: fixDriveLink('https://drive.google.com/file/d/1MBoVGnBn5CZMyO-YEWD1c0X19XGUVxRV/view?usp=drive_link')
+          }
+        ]
+      },
+      {
+        id: 105,
+        name: 'Vitalidade',
+        variants: [
+          {
+            id: 'vitalidade-laranjeira',
+            name: 'Flor de Laranjeira',
+            price: 40,
+            image: fixDriveLink('https://drive.google.com/file/d/1sSmTwQ7_uydwHvSsDKnrzAsPukmlhuU0/view?usp=drive_link')
+          }
+        ]
+      },
+      {
+        id: 106,
+        name: 'Paixão',
+        variants: [
+          {
+            id: 'paixao-cravoecanela',
+            name: 'Cravo e Canela',
+            price: 40,
+            image: fixDriveLink('https://drive.google.com/file/d/1sSmTwQ7_uydwHvSsDKnrzAsPukmlhuU0/view?usp=drive_link')
+          }
+        ]
+      },
+    ],
+  },
+  {
+    id: 2,
+    name: 'Clássicas',
+    image: fixDriveLink('https://drive.google.com/file/d/12s1iaSYz6foLSWjPjWdE0-vyMbbdf4nD/view?usp=drive_link'),
+
+    products: [
+      {
+        id: 201,
+        name: 'Glitter',
+        variants: [
+          {
+            id: 'glitter-lavanda',
+            name: 'Lavanda',
+            price: 50,
+            image: fixDriveLink('https://drive.google.com/file/d/1sSmTwQ7_uydwHvSsDKnrzAsPukmlhuU0/view?usp=drive_link')
+          },
+          {
+            id: 'glitter-orquidia',
+            name: 'Orquídia',
+            price: 50,
+            image: fixDriveLink('https://drive.google.com/file/d/1sSmTwQ7_uydwHvSsDKnrzAsPukmlhuU0/view?usp=drive_link')
+          },
+          {
+            id: 'glitter-herbal',
+            name: 'Herbal',
+            price: 50,
+            image: fixDriveLink('https://drive.google.com/file/d/1sSmTwQ7_uydwHvSsDKnrzAsPukmlhuU0/view?usp=drive_link')
+          },
+          {
+            id: 'glitter-laranjeira',
+            name: 'Flor de Laranjeira',
+            price: 50,
+            image: fixDriveLink('https://drive.google.com/file/d/1sSmTwQ7_uydwHvSsDKnrzAsPukmlhuU0/view?usp=drive_link')
+          },
+        ],
+      },
+      {
+        id: 202,
+        name: 'Pote 230g',
+        variants: [
+          {
+            id: 'pote230g-laranjeira',
+            name: 'Flor de Laranjeira',
+            price: 50,
+            image: fixDriveLink('https://drive.google.com/file/d/1sSmTwQ7_uydwHvSsDKnrzAsPukmlhuU0/view?usp=drive_link')
+          }
+        ]
+      },
+    ],
+  },
+  {
+    id: 3,
+    name: 'Gesso',
+    image: fixDriveLink('https://drive.google.com/file/d/1L-Mq6LjbQ9UndSbmRHkp8S0TE0-hGmXa/view?usp=drive_link'),
+
+    products: [
+      {
+        id: 301,
+        name: 'Verde',
+        variants: [
+          {
+            id: 'verde-herbal',
+            name: 'Herbal',
+            price: 45,
+            image: fixDriveLink('https://drive.google.com/file/d/1sSmTwQ7_uydwHvSsDKnrzAsPukmlhuU0/view?usp=drive_link')
+          }
+        ]
+      },
+      {
+        id: 302,
+        name: 'Roxo',
+        variants: [
+          {
+            id: 'roxo-lavanda',
+            name: 'Lavanda',
+            price: 45,
+            image: fixDriveLink('https://drive.google.com/file/d/1sSmTwQ7_uydwHvSsDKnrzAsPukmlhuU0/view?usp=drive_link')
+          }
+        ]
+      },
+    ],
+  },
+];
+
+export default categoriesData;
+```
+
+> **Key differences** from your previous version:
+> - Each `product` now has a `variants` array.  
+> - Each variant has `name`, `price`, `image`, plus an **ID** for easy tracking.  
+> - We added a helper `fixDriveLink()` to convert your Google Drive share URLs to direct-embed URLs.  
+
+---
+
+## 2) Creating a Product Detail Page with Variant Selection
+
+Because we now have products that can hold **multiple variants**, let’s create or modify a detail page (e.g. `ProductDetail.js`). A simple approach is:
+
+1. **Route**: `"/product/:productId"`  
+2. We’ll **find** the product from `categoriesData` (by ID or by slug).  
+3. **Render** the list of variants (e.g. a `<select>` or a grid of radio buttons).  
+4. On “Add to Cart,” we attach the chosen `variant`.
+
+Below is an **example** detail page. You can adapt it to your style:
+
+```js
+// src/pages/ProductDetail.js
 import React, { useState } from 'react';
+import { useParams } from 'react-router-dom';
+import categoriesData from '../data/categoriesData';
 import { useCart } from '../context/CartContext';
 
-function Cart() {
-  const {
-    cartItems,
-    addToCart,
-    removeFromCart,
-    removeItemCompletely,
-    clearCart,
-    totalPrice,
-  } = useCart();
+function ProductDetail() {
+  const { productId } = useParams(); 
+  const { addToCart } = useCart();
+  const [selectedVariant, setSelectedVariant] = useState(null);
 
-  // We'll store an address the user can type
-  const [address, setAddress] = useState('');
+  // Find which product in which category matches productId (which is a number/string)
+  let foundProduct = null;
 
-  // Construct WhatsApp order message
-  const buildWhatsAppMessage = () => {
-    if (cartItems.length === 0) return '';
-
-    let message = 'Olá, Turi Ateliê! Gostaria de finalizar minha compra:%0A%0A';
-
-    cartItems.forEach((item) => {
-      message += `- ${item.quantity} x ${item.name} (R$ ${item.price.toFixed(2)})%0A`;
-    });
-
-    message += `%0AValor total: R$ ${totalPrice.toFixed(2)}`;
-    message += `%0AEndereço de entrega: ${encodeURIComponent(address)}`;
-    message += '%0A%0AMuito obrigado! Aguardo informações sobre a finalização do pedido.';
-
-    return message;
-  };
-
-  const whatsAppLink = `https://wa.me/24992288877?text=${buildWhatsAppMessage()}`;
-
-  if (cartItems.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', padding: '2rem' }}>
-        <h2>Seu carrinho está vazio.</h2>
-      </div>
-    );
+  for (let category of categoriesData) {
+    const prod = category.products.find(p => p.id.toString() === productId);
+    if (prod) {
+      foundProduct = { ...prod, categoryName: category.name };
+      break;
+    }
   }
+
+  if (!foundProduct) {
+    return <div style={{ padding: '2rem' }}>Produto não encontrado.</div>;
+  }
+
+  const handleAddToCart = () => {
+    if (!selectedVariant) return;
+
+    // We'll pass an object containing both product info AND variant info to addToCart.
+    // For example, store them as { productId, productName, variantId, variantName, price, image }.
+    const cartItem = {
+      id: `${foundProduct.id}-${selectedVariant.id}`,  // unique combo
+      productId: foundProduct.id,
+      name: foundProduct.name,        // e.g. "Glitter"
+      variant: selectedVariant.name,  // e.g. "Lavanda"
+      price: selectedVariant.price,
+      image: selectedVariant.image,
+    };
+    addToCart(cartItem);
+  };
 
   return (
     <div style={{ padding: '2rem' }}>
-      <h2 style={{ textAlign: 'center', marginBottom: '2rem' }}>Carrinho de Compras</h2>
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '2rem' }}>
-        <thead>
-          <tr>
-            <th style={{ borderBottom: '1px solid #ddd', textAlign: 'left', padding: '0.5rem' }}>Produto</th>
-            <th style={{ borderBottom: '1px solid #ddd', textAlign: 'center', padding: '0.5rem' }}>Preço</th>
-            <th style={{ borderBottom: '1px solid #ddd', textAlign: 'center', padding: '0.5rem' }}>Quantidade</th>
-            <th style={{ borderBottom: '1px solid #ddd', textAlign: 'center', padding: '0.5rem' }}>Subtotal</th>
-            <th style={{ borderBottom: '1px solid #ddd', padding: '0.5rem' }}></th>
-          </tr>
-        </thead>
-        <tbody>
-          {cartItems.map((item) => {
-            const itemSubtotal = item.price * item.quantity;
-            return (
-              <tr key={item.id}>
-                <td style={{ borderBottom: '1px solid #ddd', padding: '0.5rem' }}>{item.name}</td>
-                <td style={{ borderBottom: '1px solid #ddd', textAlign: 'center', padding: '0.5rem' }}>
-                  R$ {item.price.toFixed(2)}
-                </td>
-                <td style={{ borderBottom: '1px solid #ddd', textAlign: 'center', padding: '0.5rem' }}>
-                  <button
-                    className="btn"
-                    style={{ marginRight: '0.5rem' }}
-                    onClick={() => removeFromCart(item.id)}
-                  >
-                    -
-                  </button>
-                  {item.quantity}
-                  <button
-                    className="btn"
-                    style={{ marginLeft: '0.5rem' }}
-                    onClick={() => addToCart(item)}
-                  >
-                    +
-                  </button>
-                </td>
-                <td style={{ borderBottom: '1px solid #ddd', textAlign: 'center', padding: '0.5rem' }}>
-                  R$ {itemSubtotal.toFixed(2)}
-                </td>
-                <td style={{ borderBottom: '1px solid #ddd', textAlign: 'center', padding: '0.5rem' }}>
-                  <button
-                    className="btn"
-                    style={{ backgroundColor: '#c0392b' }}
-                    onClick={() => removeItemCompletely(item.id)}
-                  >
-                    Remover
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <h2>{foundProduct.name}</h2>
+      <p style={{ color: '#666' }}>Categoria: {foundProduct.categoryName}</p>
       
-      <div style={{ marginBottom: '2rem', textAlign: 'right' }}>
-        <h3>Total: R$ {totalPrice.toFixed(2)}</h3>
-      </div>
-
-      <div style={{ marginBottom: '2rem' }}>
-        <label htmlFor="address" style={{ display: 'block', marginBottom: '0.5rem' }}>Endereço de Entrega:</label>
-        <input
-          id="address"
-          type="text"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '0.5rem',
-            fontSize: '1rem',
-            borderRadius: '4px',
-            border: '1px solid #ccc',
-          }}
-          placeholder="Digite seu endereço completo..."
-        />
-      </div>
-
-      <div style={{ textAlign: 'right' }}>
-        <button className="btn" style={{ marginRight: '1rem' }} onClick={clearCart}>
-          Limpar Carrinho
-        </button>
-        <a href={whatsAppLink} target="_blank" rel="noopener noreferrer" className="btn">
-          Finalizar Compra (WhatsApp)
-        </a>
-      </div>
-    </div>
-  );
-}
-
-export default Cart;
-```
-
-**Explanation**:  
-- The user can increase/decrease item quantities.  
-- The user can remove an item entirely.  
-- The user enters an address before clicking **Finalizar Compra**.  
-- Clicking **Finalizar Compra** opens WhatsApp with a prefilled message that includes all cart items, total price, and the address.
-
----
-
-## 3) Update the Header to Include a Cart Link
-
-In your existing header component at:  
-```
-/src/components/Header.js
-```
-Replace with:
-
-```js
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { useCart } from '../context/CartContext';
-
-function Header() {
-  const { cartItems } = useCart();
-  
-  // Calculate the total quantity for the cart badge
-  const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-
-  return (
-    <header>
-      <h1>Turi Ateliê</h1>
-      <nav>
-        <Link to="/">Início</Link>
-        <Link to="/produtos">Produtos</Link>
-        <Link to="/cart" style={{ marginLeft: '1rem', position: 'relative' }}>
-          Carrinho
-          {totalQuantity > 0 && (
-            <span
-              style={{
-                background: '#c0392b',
-                color: '#fff',
-                borderRadius: '50%',
-                padding: '0.2rem 0.5rem',
-                fontSize: '0.8rem',
-                marginLeft: '0.3rem',
-                position: 'absolute',
-                top: '-10px',
-                right: '-10px',
-              }}
-            >
-              {totalQuantity}
-            </span>
-          )}
-        </Link>
-      </nav>
-    </header>
-  );
-}
-
-export default Header;
-```
-
-**Explanation**:  
-- We import `useCart` so we can display a badge with the total number of items in the cart.  
-- A new **Carrinho** link points to `/cart`.
-
----
-
-## 4) Update the Products Page to Allow Adding Items to the Cart
-
-At:  
-```
-/src/pages/Products.js
-```
-Replace with:
-
-```js
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { useCart } from '../context/CartContext';
-import homeBackground from '../assets/home-background.png';
-
-function Products() {
-  // Example product list (you can replace with your own logic/data):
-  const productList = [
-    {
-      id: 1,
-      name: 'Velas dos Desejos',
-      image: homeBackground,
-      price: 30.0,
-      detailsLink: '/vela-dos-desejos',
-    },
-    {
-      id: 2,
-      name: 'Velas Clássicas',
-      image: 'https://via.placeholder.com/300x200?text=Velas+Cl%C3%A1ssicas',
-      price: 15.0,
-      detailsLink: '#',
-    },
-    {
-      id: 3,
-      name: 'Velas no Gesso',
-      image: 'https://via.placeholder.com/300x200?text=Velas+no+Gesso',
-      price: 25.0,
-      detailsLink: '#',
-    },
-  ];
-
-  const { addToCart } = useCart();
-
-  return (
-    <div id="produtos">
-      <h2 style={{ textAlign: 'center', marginBottom: '2rem' }}>Nossos Produtos</h2>
-      <div className="product-container">
-        {productList.map((product) => (
+      {/* If product has multiple variants, show them all */}
+      {foundProduct.variants.length > 1 && <p>Escolha a variante:</p>}
+      
+      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+        {foundProduct.variants.map((variant) => (
           <div
-            key={product.id}
-            className={
-              product.name === 'Velas dos Desejos'
-                ? 'product-card product-card-first'
-                : 'product-card'
-            }
-            style={
-              product.name === 'Velas dos Desejos'
-                ? {
-                    backgroundImage: `url(${product.image})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                  }
-                : {}
-            }
+            key={variant.id}
+            onClick={() => setSelectedVariant(variant)}
+            style={{
+              cursor: 'pointer',
+              border: selectedVariant?.id === variant.id ? '2px solid #8b7355' : '1px solid #ccc',
+              borderRadius: '6px',
+              padding: '1rem',
+              textAlign: 'center',
+              width: '150px'
+            }}
           >
-            {product.name !== 'Velas dos Desejos' && (
-              <img
-                src={product.image}
-                alt={product.name}
-              />
-            )}
-            <div
-              className="info"
-              style={
-                product.name === 'Velas dos Desejos'
-                  ? { backgroundColor: 'rgba(0, 0, 0, 0.4)', padding: '1rem' }
-                  : {}
-              }
-            >
-              <h3 style={{ marginBottom: '0.5rem' }}>{product.name}</h3>
-              <p>R$ {product.price.toFixed(2)}</p>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <Link
-                  to={product.detailsLink}
-                  className="btn"
-                  style={{ textDecoration: 'none' }}
-                >
-                  Detalhes
-                </Link>
-                <button
-                  className="btn"
-                  onClick={() => addToCart(product)}
-                >
-                  Adicionar ao Carrinho
-                </button>
-              </div>
-            </div>
+            <img 
+              src={variant.image} 
+              alt={variant.name} 
+              style={{ width: '100%', height: '100px', objectFit: 'cover', marginBottom: '0.5rem' }}
+            />
+            <strong>{variant.name}</strong>
+            <p style={{ margin: '0.5rem 0' }}>R$ {variant.price.toFixed(2)}</p>
           </div>
         ))}
       </div>
+
+      <button 
+        className="btn" 
+        onClick={handleAddToCart} 
+        disabled={!selectedVariant} 
+        style={{ marginTop: '1rem' }}
+      >
+        Adicionar ao Carrinho
+      </button>
     </div>
   );
 }
 
-export default Products;
+export default ProductDetail;
 ```
 
-**Explanation**:  
-- We define a small `productList` array with an `id`, `name`, `price`, an image, and a `detailsLink`.  
-- For each product, we show a "Detalhes" button (still linking to the existing detail page if relevant) and an **Adicionar ao Carrinho** button, which calls `addToCart(product)` from our context.
+### Routing Example
 
----
-
-## 5) Update App.js to Wrap with the CartProvider & Add a Cart Route
-
-At:  
-```
-/src/App.js
-```
-Replace with:
+In your `App.js`, add a route like:
 
 ```js
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Layout from './components/Layout';
-import Home from './pages/Home';
-import Products from './pages/Products';
-import VelaDosDesejosDetalhe from './pages/VelaDosDesejosDetalhe';
-import Cart from './pages/Cart';
-import { CartProvider } from './context/CartContext';
-import './App.css';
+// src/App.js
+import ProductDetail from './pages/ProductDetail';
+...
+<Routes>
+  <Route path="/" element={<Home />} />
+  <Route path="/produtos" element={<Products />} />
+  
+  {/* New route for a specific product, e.g. /produto/201 */}
+  <Route path="/produto/:productId" element={<ProductDetail />} />
 
-function App() {
-  return (
-    <Router>
-      {/* Wrap everything with CartProvider */}
-      <CartProvider>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/produtos" element={<Products />} />
-            <Route path="/vela-dos-desejos" element={<VelaDosDesejosDetalhe />} />
-            <Route path="/cart" element={<Cart />} />
-          </Routes>
-        </Layout>
-      </CartProvider>
-    </Router>
-  );
-}
-
-export default App;
+  <Route path="/cart" element={<Cart />} />
+</Routes>
 ```
 
-**Explanation**:  
-- We import `Cart` and add a new route for it: `/cart`.  
-- We wrap our entire application in the `<CartProvider>` so that all components can access the cart context.
+### Linking to the Detail Page
+
+On your `Products.js`, instead of linking to `"#"` for “Detalhes,” you can do:
+
+```js
+<Link
+  to={`/produto/${product.id}`}
+  className="btn"
+  style={{ textDecoration: 'none' }}
+>
+  Detalhes
+</Link>
+```
+
+> This ensures that when a user clicks “Detalhes,” it goes to something like `"/produto/201"`, where `201` is your product’s ID.
 
 ---
 
-## 6) (Optional) Minor CSS Adjustments
+## 3) Ensure Variant Appears in the Cart
 
-Your existing `App.css` should already have `.btn` and other classes. If you’d like to style the new Cart table further or adjust the buttons, you can do so directly in `App.css`.
+Your `CartContext` is already storing items as an array of objects. The main tweak is to include a `variant` (or similar) property in each cart item. In the sample `ProductDetail` above, we used:
+
+```js
+const cartItem = {
+  id: `${foundProduct.id}-${selectedVariant.id}`,  // combine product + variant
+  productId: foundProduct.id,
+  name: foundProduct.name,
+  variant: selectedVariant.name,
+  price: selectedVariant.price,
+  image: selectedVariant.image,
+};
+```
+
+Then in your `Cart.js`, you can display the `variant`:
+
+```js
+<li key={item.id}>
+  {item.name} 
+  {item.variant && <span> - {item.variant}</span>} 
+  &nbsp; x {item.quantity} 
+  &nbsp; (R$ {item.price.toFixed(2)})
+</li>
+```
+
+Or in a table format:
+
+```jsx
+<tr>
+  <td>
+    {item.name}
+    {item.variant && <div style={{ fontSize: '0.9rem', color: '#555' }}>
+      Variante: {item.variant}
+    </div>}
+  </td>
+  <td>R$ {item.price.toFixed(2)}</td>
+  ...
+</tr>
+```
 
 ---
 
-# Final Project Structure
+## Final Thoughts
 
-```
-turi-atelie
-├── README.md
-├── package.json
-├── public
-│   ├── favicon.ico
-│   ├── index.html
-│   ├── logo512.png
-│   ├── logo192.png
-│   ├── manifest.json
-│   └── robots.txt
-├── src
-│   ├── App.css
-│   ├── App.js               <-- Updated
-│   ├── index.js
-│   ├── context
-│   │   └── CartContext.js   <-- New
-│   ├── components
-│   │   ├── Header.js        <-- Updated
-│   │   ├── Footer.js
-│   │   └── Layout.js
-│   ├── pages
-│   │   ├── Home.js
-│   │   ├── Products.js      <-- Updated
-│   │   ├── Cart.js          <-- New
-│   │   └── VelaDosDesejosDetalhe.js
-│   └── assets
-│       ├── home_0.png
-│       ├── home-background.jpg
-│       └── products
-│           ├── cravoecanela.png
-│           ├── coracao.png
-│           └── laranja.png
-└── ...
-```
+- **Drive links**: Always convert to `https://drive.google.com/uc?export=view&id=<FILE_ID>` for images.  
+- **Data structure**: We group repeated “Produto” rows into a single `products[]` item with multiple `variants[]`.  
+- **Detail page**: Let the user pick a variant, then add to cart with `variant` info.  
+- **Cart**: Display both the product name **and** variant name so the user knows exactly which variant they chose.  
 
-With these changes:
-
-- Users can **add** or **remove** products from the cart.  
-- They can **finalize** the purchase by clicking the **WhatsApp** button, opening a pre-filled message at **+55 (24) 99228-8877**.  
-- They can specify **address** inside the cart page.  
-- Price totals and item quantities are updated dynamically.
-
-This setup should be ready for production build (e.g., `npm run build`), and it follows the general best practices for a simple React application with a global **Cart** state. Enjoy coding!
+With these adjustments, you’ll have **clean category and product data**, robust handling of **variants**, and images that are properly embeddable from Google Drive. Enjoy building your store!

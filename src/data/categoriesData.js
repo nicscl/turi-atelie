@@ -1,20 +1,8 @@
-function fixDriveLink(shareUrl) {
-  // Example input: "https://drive.google.com/file/d/1ABC123/view?usp=drive_link"
-  // We extract "1ABC123" and return: "https://drive.google.com/uc?export=view&id=1ABC123"
-  const match = shareUrl.match(/\/d\/([^/]+)\//);
-  if (!match) {
-    // If we can't parse, fallback to original or a placeholder
-    return shareUrl;
-  }
-  const fileId = match[1];
-  return `https://drive.google.com/uc?export=view&id=${fileId}`;
-}
-
 const categoriesData = [
   {
     id: 1,
     name: 'Desejos',
-    image: fixDriveLink('https://drive.google.com/file/d/1ek7Rw8ZpvLF15iHtbltq3uBD-UobGfq9/view?usp=drive_link'),
+    image: 'https://firebasestorage.googleapis.com/v0/b/turi-velas.firebasestorage.app/o/pote.png?alt=media&amp;token=cbc24fd0-eaf2-4377-ab3b-e1dda41ff857',
     products: [
       {
         id: 101,
@@ -24,7 +12,7 @@ const categoriesData = [
             id: 'harmonia-lavanda',
             name: 'Lavanda',
             price: 40,
-            image: fixDriveLink('https://drive.google.com/file/d/12s1iaSYz6foLSWjPjWdE0-vyMbbdf4nD/view?usp=drive_link')
+            image: 'https://firebasestorage.googleapis.com/v0/b/turi-velas.firebasestorage.app/o/gesso.png?alt=media&amp;token=bac594b7-bf2a-468d-952a-7e441593d73d'
           },
         ]
       },
@@ -34,9 +22,9 @@ const categoriesData = [
         variants: [
           {
             id: 'serenidade-orquidia',
-            name: 'Orquídia',
+            name: 'Orquidia',
             price: 40,
-            image: fixDriveLink('https://drive.google.com/file/d/1L-Mq6LjbQ9UndSbmRHkp8S0TE0-hGmXa/view?usp=drive_link')
+            image: 'https://firebasestorage.googleapis.com/v0/b/turi-velas.firebasestorage.app/o/gesso.png?alt=media&amp;token=bac594b7-bf2a-468d-952a-7e441593d73d'
           },
         ]
       },
@@ -48,19 +36,19 @@ const categoriesData = [
             id: 'sorte-herbal',
             name: 'Herbal',
             price: 40,
-            image: fixDriveLink('https://drive.google.com/file/d/1ek7Rw8ZpvLF15iHtbltq3uBD-UobGfq9/view?usp=drive_link')
+            image: 'https://firebasestorage.googleapis.com/v0/b/turi-velas.firebasestorage.app/o/gesso.png?alt=media&amp;token=bac594b7-bf2a-468d-952a-7e441593d73d'
           }
         ]
       },
       {
         id: 104,
-        name: 'Abundância',
+        name: 'Abundancia',
         variants: [
           {
             id: 'abundancia-alecrim',
             name: 'Alecrim',
             price: 40,
-            image: fixDriveLink('https://drive.google.com/file/d/1MBoVGnBn5CZMyO-YEWD1c0X19XGUVxRV/view?usp=drive_link')
+            image: 'https://firebasestorage.googleapis.com/v0/b/turi-velas.firebasestorage.app/o/gesso.png?alt=media&amp;token=bac594b7-bf2a-468d-952a-7e441593d73d'
           }
         ]
       },
@@ -72,7 +60,7 @@ const categoriesData = [
             id: 'vitalidade-laranjeira',
             name: 'Flor de Laranjeira',
             price: 40,
-            image: fixDriveLink('https://drive.google.com/file/d/1sSmTwQ7_uydwHvSsDKnrzAsPukmlhuU0/view?usp=drive_link')
+            image: 'https://firebasestorage.googleapis.com/v0/b/turi-velas.firebasestorage.app/o/gesso.png?alt=media&amp;token=bac594b7-bf2a-468d-952a-7e441593d73d'
           }
         ]
       },
@@ -84,7 +72,7 @@ const categoriesData = [
             id: 'paixao-cravoecanela',
             name: 'Cravo e Canela',
             price: 40,
-            image: fixDriveLink('https://drive.google.com/file/d/1sSmTwQ7_uydwHvSsDKnrzAsPukmlhuU0/view?usp=drive_link')
+            image: 'https://firebasestorage.googleapis.com/v0/b/turi-velas.firebasestorage.app/o/gesso.png?alt=media&amp;token=bac594b7-bf2a-468d-952a-7e441593d73d'
           }
         ]
       },
@@ -93,7 +81,7 @@ const categoriesData = [
   {
     id: 2,
     name: 'Clássicas',
-    image: fixDriveLink('https://drive.google.com/file/d/12s1iaSYz6foLSWjPjWdE0-vyMbbdf4nD/view?usp=drive_link'),
+    image: 'https://firebasestorage.googleapis.com/v0/b/turi-velas.firebasestorage.app/o/gesso_verde.png?alt=media&amp;token=43262398-2c97-43fb-9d31-855fbba1df70',
     products: [
       {
         id: 201,
@@ -103,25 +91,25 @@ const categoriesData = [
             id: 'glitter-lavanda',
             name: 'Lavanda',
             price: 50,
-            image: fixDriveLink('https://drive.google.com/file/d/1sSmTwQ7_uydwHvSsDKnrzAsPukmlhuU0/view?usp=drive_link')
+            image: 'https://firebasestorage.googleapis.com/v0/b/turi-velas.firebasestorage.app/o/gesso.png?alt=media&amp;token=bac594b7-bf2a-468d-952a-7e441593d73d'
           },
           {
             id: 'glitter-orquidia',
-            name: 'Orquídia',
+            name: 'Orquiídia',
             price: 50,
-            image: fixDriveLink('https://drive.google.com/file/d/1sSmTwQ7_uydwHvSsDKnrzAsPukmlhuU0/view?usp=drive_link')
+            image: 'https://firebasestorage.googleapis.com/v0/b/turi-velas.firebasestorage.app/o/gesso.png?alt=media&amp;token=bac594b7-bf2a-468d-952a-7e441593d73d'
           },
           {
             id: 'glitter-herbal',
             name: 'Herbal',
             price: 50,
-            image: fixDriveLink('https://drive.google.com/file/d/1sSmTwQ7_uydwHvSsDKnrzAsPukmlhuU0/view?usp=drive_link')
+            image: 'https://firebasestorage.googleapis.com/v0/b/turi-velas.firebasestorage.app/o/gesso.png?alt=media&amp;token=bac594b7-bf2a-468d-952a-7e441593d73d'
           },
           {
             id: 'glitter-laranjeira',
             name: 'Flor de Laranjeira',
             price: 50,
-            image: fixDriveLink('https://drive.google.com/file/d/1sSmTwQ7_uydwHvSsDKnrzAsPukmlhuU0/view?usp=drive_link')
+            image: 'https://firebasestorage.googleapis.com/v0/b/turi-velas.firebasestorage.app/o/gesso.png?alt=media&amp;token=bac594b7-bf2a-468d-952a-7e441593d73d'
           },
         ],
       },
@@ -133,7 +121,7 @@ const categoriesData = [
             id: 'pote230g-laranjeira',
             name: 'Flor de Laranjeira',
             price: 50,
-            image: fixDriveLink('https://drive.google.com/file/d/1sSmTwQ7_uydwHvSsDKnrzAsPukmlhuU0/view?usp=drive_link')
+            image: 'https://firebasestorage.googleapis.com/v0/b/turi-velas.firebasestorage.app/o/gesso.png?alt=media&amp;token=bac594b7-bf2a-468d-952a-7e441593d73d'
           }
         ]
       },
@@ -142,7 +130,7 @@ const categoriesData = [
   {
     id: 3,
     name: 'Gesso',
-    image: fixDriveLink('https://drive.google.com/file/d/1L-Mq6LjbQ9UndSbmRHkp8S0TE0-hGmXa/view?usp=drive_link'),
+    image: 'https://firebasestorage.googleapis.com/v0/b/turi-velas.firebasestorage.app/o/gesso_roxo.png?alt=media&amp;token=732dabfd-bb9b-4c8e-a21a-0f709ef88dfb',
     products: [
       {
         id: 301,
@@ -152,7 +140,7 @@ const categoriesData = [
             id: 'verde-herbal',
             name: 'Herbal',
             price: 45,
-            image: fixDriveLink('https://drive.google.com/file/d/1sSmTwQ7_uydwHvSsDKnrzAsPukmlhuU0/view?usp=drive_link')
+            image: 'https://firebasestorage.googleapis.com/v0/b/turi-velas.firebasestorage.app/o/gesso.png?alt=media&amp;token=bac594b7-bf2a-468d-952a-7e441593d73d'
           }
         ]
       },
@@ -164,7 +152,7 @@ const categoriesData = [
             id: 'roxo-lavanda',
             name: 'Lavanda',
             price: 45,
-            image: fixDriveLink('https://drive.google.com/file/d/1sSmTwQ7_uydwHvSsDKnrzAsPukmlhuU0/view?usp=drive_link')
+            image: 'https://firebasestorage.googleapis.com/v0/b/turi-velas.firebasestorage.app/o/gesso.png?alt=media&amp;token=bac594b7-bf2a-468d-952a-7e441593d73d'
           }
         ]
       },

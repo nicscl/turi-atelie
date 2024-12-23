@@ -1,23 +1,35 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useCart } from '../context/CartContext';
-import categoriesData from '../data/categoriesData';
+import { useCart } from '../context/CartContext.js';
+import { getAllCategories } from '../services/firestoreService.js';
 
 function Products() {
   const { addToCart } = useCart();
+
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    async function fetchData() {
+      const data = await getAllCategories();
+      setCategories(data);
+    }
+    fetchData();
+  }, []);
 
   return (
     <div id="produtos">
       <h2 style={{ textAlign: 'center', marginBottom: '2rem' }}>Nossos Produtos</h2>
 
-      {categoriesData.map((category) => (
+      {categories.map((category) => (
         <div key={category.id} style={{ marginBottom: '3rem' }}>
           <h3 style={{ marginBottom: '1rem', color: '#4A3F35' }}>{category.name}</h3>
           <div className="product-container">
             {category.products.map((product) => {
-              // Use the first variant as the display variant
-              const displayVariant = product.variants[0];
-              
+              // Use the first variant as the display variant if it exists
+              const displayVariant = product.variants && product.variants.length > 0
+                ? product.variants[0]
+                : { price: 0, image: "", name: "" };
+
               return (
                 <div key={product.id} className="product-card">
                   <img

@@ -1,13 +1,13 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Layout from './components/Layout';
-import Home from './pages/Home';
-import Products from './pages/Products';
-import ProductDetail from './pages/ProductDetail';
-import Cart from './pages/Cart';
-import { CartProvider } from './context/CartContext';
+import Layout from './components/Layout.js';
+import Home from './pages/Home.js';
+import Products from './pages/Products.js';
+import ProductDetail from './pages/ProductDetail.js';
+import Cart from './pages/Cart.js';
+import { CartProvider } from './context/CartContext.js';
 import './App.css';
-import { app, analytics } from './firebase/config';
+import { app, analytics } from './firebase/config.js';
 
 function App() {
   return (

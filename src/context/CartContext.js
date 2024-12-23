@@ -17,13 +17,17 @@ export function CartProvider({ children }) {
     setCartItems((prevItems) => {
       // Check if item already exists
       const existingItemIndex = prevItems.findIndex((item) => item.id === product.id);
+      
       if (existingItemIndex >= 0) {
-        // Increase quantity
+        // Increase quantity of existing item
         const updatedItems = [...prevItems];
-        updatedItems[existingItemIndex].quantity += 1;
+        updatedItems[existingItemIndex] = {
+          ...updatedItems[existingItemIndex],
+          quantity: updatedItems[existingItemIndex].quantity + 1
+        };
         return updatedItems;
       } else {
-        // Add new item
+        // Add new item with quantity 1
         return [...prevItems, { ...product, quantity: 1 }];
       }
     });

@@ -1,33 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import categoriesData from '../data/categoriesData';
-import { useCart } from '../context/CartContext';
+import { useCart } from '../context/CartContext.js';
+import { getProductById } from '../services/firestoreService.js';
 
 function ProductDetail() {
-  const { productId } = useParams(); 
+  const { productId } = useParams();
   const { addToCart } = useCart();
   const [selectedVariant, setSelectedVariant] = useState(null);
+  const [foundProduct, setFoundProduct] = useState(null);
 
-  // Find which product in which category matches productId
-  let foundProduct = null;
-
-  for (let category of categoriesData) {
-    const prod = category.products.find(p => p.id.toString() === productId);
-    if (prod) {
-      foundProduct = { ...prod, categoryName: category.name };
-      break;
+  useEffect(() => {
+    async function fetchProduct() {
+      const product = await getProductById(productId);
+      setFoundProduct(product);
     }
-  }
+    fetchProduct();
+  }, [productId]);
 
   if (!foundProduct) {
-    return <div style={{ padding: '2rem' }}>Produto não encontrado.</div>;
+    return <div style={{ padding: '2rem' }}>Carregando produto ou não encontrado...</div>;
   }
 
   const handleAddToCart = () => {
     if (!selectedVariant) return;
-
     const cartItem = {
-      id: `${foundProduct.id}-${selectedVariant.id}`,  // unique combo
+      id: `${foundProduct.id}-${selectedVariant.id}`,
       productId: foundProduct.id,
       name: foundProduct.name,
       variant: selectedVariant.name,
@@ -38,46 +35,42 @@ function ProductDetail() {
   };
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
-      <h2 className="text-2xl font-bold mb-4">{foundProduct.name}</h2>
-      <p className="text-gray-600 mb-6">Categoria: {foundProduct.categoryName}</p>
-      
-      {foundProduct.variants.length > 1 && (
-        <p className="text-lg mb-4">Escolha a variante:</p>
-      )}
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div style={{ padding: '2rem' }}>
+      <h2>{foundProduct.name}</h2>
+      <p style={{ color: '#666' }}>Categoria: {foundProduct.categoryName}</p>
+
+      {foundProduct.variants.length > 1 && <p>Escolha a variante:</p>}
+      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
         {foundProduct.variants.map((variant) => (
           <div
             key={variant.id}
             onClick={() => setSelectedVariant(variant)}
-            className={`cursor-pointer rounded-lg border p-4 transition-all ${
-              selectedVariant?.id === variant.id 
-                ? 'border-2 border-amber-600' 
-                : 'border-gray-200 hover:border-amber-400'
-            }`}
+            style={{
+              cursor: 'pointer',
+              border: selectedVariant?.id === variant.id ? '2px solid #8b7355' : '1px solid #ccc',
+              borderRadius: '6px',
+              padding: '1rem',
+              textAlign: 'center',
+              width: '150px'
+            }}
           >
-            <img 
-              src={variant.image} 
-              alt={variant.name} 
-              className="w-full h-48 object-cover rounded-lg mb-4"
+            <img
+              src={variant.image}
+              alt={variant.name}
+              style={{ width: '100%', height: '100px', objectFit: 'cover', marginBottom: '0.5rem' }}
             />
-            <h3 className="font-semibold text-lg mb-2">{variant.name}</h3>
-            <p className="text-amber-600 font-bold">
-              R$ {variant.price.toFixed(2)}
-            </p>
+            <strong>{variant.name}</strong>
+            <p style={{ margin: '0.5rem 0' }}>R$ {variant.price.toFixed(2)}</p>
+            <p style={{ fontSize: '0.8rem', color: '#666' }}>Estoque: {variant.stock ?? 0}</p>
           </div>
         ))}
       </div>
 
       <button 
+        className="btn"
         onClick={handleAddToCart} 
         disabled={!selectedVariant}
-        className={`mt-8 px-6 py-3 rounded-lg font-semibold transition-all ${
-          selectedVariant
-            ? 'bg-amber-600 text-white hover:bg-amber-700'
-            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-        }`}
+        style={{ marginTop: '1rem' }}
       >
         Adicionar ao Carrinho
       </button>
