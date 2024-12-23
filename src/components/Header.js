@@ -27,7 +27,7 @@ function Header() {
                 marginLeft: '0.3rem',
                 position: 'absolute',
                 top: '-10px',
-                right: '-10px',
+                right: '-30px',
               }}
             >
               {totalQuantity}

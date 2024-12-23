@@ -24,3 +24,4 @@ yarn-error.log*
 
 # firebase
 scripts/turi-velas-firebase-adminsdk-*.json
+.firebase/
